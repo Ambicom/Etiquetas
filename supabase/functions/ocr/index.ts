@@ -21,27 +21,25 @@ Deno.serve(async (req: Request) => {
         }
 
         const { image } = body;
-        const openRouterKey = Deno.env.get('OPENROUTER_KEY');
+        const openaiKey = Deno.env.get('OPENAI_API_KEY');
         // Forçando um modelo estável para teste
-        const model = Deno.env.get('OPENROUTER_MODEL') || "google/gemini-2.0-flash-lite-001";
+        const model = Deno.env.get('OPENAI_MODEL') || "gpt-4o-mini";
 
-        if (!openRouterKey) {
-            throw new Error('CONFIG_MISSING: OPENROUTER_KEY não está definida nas Secrets do Supabase.');
+        if (!openaiKey) {
+            throw new Error('CONFIG_MISSING: OPENAI_API_KEY não está definida nas Secrets do Supabase.');
         }
 
         if (!image) {
             throw new Error('VALIDATION_ERROR: O campo "image" (base64) é obrigatório.');
         }
 
-        console.log(`OpenRouter Request: Model=${model}`);
+        console.log(`OpenAI Request: Model=${model}`);
 
-        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${openRouterKey}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://supabase.com",
-                "X-Title": "OCR Scan"
+                "Authorization": `Bearer ${openaiKey}`,
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 model: model,
@@ -69,15 +67,15 @@ Deno.serve(async (req: Request) => {
         const resData = await response.json();
 
         if (!response.ok) {
-            // Retorna o erro exato do OpenRouter para o frontend
-            const orError = resData.error?.message || JSON.stringify(resData);
-            throw new Error(`OPENROUTER_REJECTED (${response.status}): ${orError}`);
+            // Retorna o erro exato da OpenAI para o frontend
+            const aiError = resData.error?.message || JSON.stringify(resData);
+            throw new Error(`OPENAI_REJECTED (${response.status}): ${aiError}`);
         }
 
         const content = resData.choices?.[0]?.message?.content;
 
         if (!content) {
-            throw new Error('IA_EMPTY_CONTENT: O OpenRouter não devolveu conteúdo na resposta.');
+            throw new Error('IA_EMPTY_CONTENT: A OpenAI não devolveu conteúdo na resposta.');
         }
 
         return new Response(JSON.stringify({ content }), {
@@ -91,7 +89,7 @@ Deno.serve(async (req: Request) => {
 
         return new Response(JSON.stringify({
             error: message,
-            diagnostic: "Check your OpenRouter credits or API key status on their dashboard."
+            diagnostic: "Check your OpenAI credits or API key status on their dashboard."
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,

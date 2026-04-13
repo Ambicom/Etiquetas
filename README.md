@@ -50,13 +50,17 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.27.0**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.28.0**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
-- **v2.27.0**:
-  - **Unificação de Temas (Modais)**: Padronização visual completa dos modais de detalhes em Aprovações e Inventário, corrigindo alto contraste e visibilidade no tema claro.
-  - **Otimização de Tabelas (No-Scroll)**: Remoção do scroll vertical interno das tabelas de listagem, aproveitando o fluxo natural da página já paginada.
-  - **Simplificação de Arquitetura**: Remoção da biblioteca de virtualização e refatoração do mapeamento de dados no módulo de Inventário.
+  - **v2.28.0**:
+    - **Migração de IA**: Substituição do provedor OpenRouter pela OpenAI oficial.
+    - **Otimização de Modelo**: Implementação do modelo `gpt-4o-mini` para OCR de alta performance e baixo custo.
+    - **Atualização de Edge Functions**: Refatoração completa da função de OCR para suporte nativo à API da OpenAI.
+  - **v2.27.0**:
+    - **Unificação de Temas (Modais)**: Padronização visual completa dos modais de detalhes em Aprovações e Inventário, corrigindo alto contraste e visibilidade no tema claro.
+    - **Otimização de Tabelas (No-Scroll)**: Remoção do scroll vertical interno das tabelas de listagem, aproveitando o fluxo natural da página já paginada.
+    - **Simplificação de Arquitetura**: Remoção da biblioteca de virtualização e refatoração do mapeamento de dados no módulo de Inventário.
 ## 📄 Licença
 
 Este projeto está sob a licença [MIT](LICENSE).
