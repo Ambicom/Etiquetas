@@ -18,6 +18,7 @@ describe("orders/pricing", () => {
         expect(getUnitPriceForClientAndSize(client, "Medio")).toBe(20);
         expect(getUnitPriceForClientAndSize(client, "Grande")).toBe(30);
         expect(getUnitPriceForClientAndSize(client, "Grande/A")).toBe(40);
+        expect(getUnitPriceForClientAndSize(client, "Outro")).toBe(0);
+        expect(getUnitPriceForClientAndSize(client, null)).toBe(0);
     });
 });
-

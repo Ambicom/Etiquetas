@@ -40,9 +40,12 @@ import { handleError } from "@/lib/errors";
 
 import { useAuth } from "@/components/providers/AuthProvider";
 import { Product, ProductLog } from "@/lib/types";
-import { calculateProductSize, formatTotalVolume, resolveCanonicalBrand } from "@/lib/product-utils";
+import { calculateProductSize, resolveCanonicalBrand } from "@/lib/product-utils";
 import { useRemotePrint } from "@/hooks/useRemotePrint";
 import { RemotePrinterSelector } from "@/components/printing/RemotePrinterSelector";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { buildInventoryOrSearch, sanitizeSearchTerm } from "@/lib/inventory/search";
+import { validateAndSanitizeProductUpdate } from "@/lib/inventory/validation";
 
 const statusConfig = {
     'CADASTRO': { label: 'Cadastro', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20', icon: Clock },
@@ -53,7 +56,29 @@ const statusConfig = {
     'REPROVADO': { label: 'Reprovado', color: 'bg-orange-500/10 text-orange-500 border-orange-500/20', icon: AlertCircle },
 };
 
-interface InventoryProduct extends Product {
+type InventoryRow = Pick<
+    Product,
+    | "id"
+    | "internal_serial"
+    | "original_serial"
+    | "brand"
+    | "model"
+    | "voltage"
+    | "product_type"
+    | "market_class"
+    | "refrigerant_gas"
+    | "status"
+    | "size"
+    | "created_at"
+    | "updated_at"
+    | "order_id"
+    | "photo_model"
+    | "photo_product"
+    | "photo_serial"
+    | "photo_defect"
+    | "has_water_dispenser"
+    | "volume_total"
+> & {
     orders: ({
         id: string;
         clients: {
@@ -66,14 +91,15 @@ interface InventoryProduct extends Product {
         };
     }[]) | null;
     product_logs?: ProductLog[];
-}
+};
 
 export default function InventoryPage() {
     const { profile } = useAuth();
-    const { printLabels: executeRemotePrint, selectedPrinter: activePrinter } = useRemotePrint();
-    const [products, setProducts] = useState<InventoryProduct[]>([]);
+    const { printLabels: executeRemotePrint } = useRemotePrint();
+    const [products, setProducts] = useState<InventoryRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const debouncedSearchTerm = useDebouncedValue(searchTerm, 400);
     const [statusFilter, setStatusFilter] = useState("EM ESTOQUE");
     const [brandFilter, setBrandFilter] = useState("ALL");
     const [voltageFilter, setVoltageFilter] = useState("ALL");
@@ -104,14 +130,18 @@ export default function InventoryPage() {
     useEffect(() => {
         const fetchFilters = async () => {
             try {
-                // Tenta usar a RPC para os filtros principais (mais performático)
-                const { data: rpcData } = await supabase.rpc('get_inventory_filters');
+                try {
+                    const { data: rpcData, error: rpcError } = await supabase.rpc('get_inventory_filters');
+                    if (rpcError) throw rpcError;
 
-                if (rpcData && rpcData.length > 0) {
-                    const brands = Array.from(new Set(rpcData.map((p: any) => p.brand))).filter(Boolean) as string[];
-                    const voltages = Array.from(new Set(rpcData.map((p: any) => p.voltage))).filter(Boolean) as string[];
-                    setAvailableBrands(brands.sort());
-                    setAvailableVoltages(voltages.sort());
+                    if (rpcData && rpcData.length > 0) {
+                        const brands = Array.from(new Set(rpcData.map((p: any) => p.brand))).filter(Boolean) as string[];
+                        const voltages = Array.from(new Set(rpcData.map((p: any) => p.voltage))).filter(Boolean) as string[];
+                        setAvailableBrands(brands.sort());
+                        setAvailableVoltages(voltages.sort());
+                    }
+                } catch (rpcError) {
+                    handleError(rpcError, "Falha ao carregar filtros (RPC)");
                 }
 
                 // Busca os outros filtros de forma otimizada (apenas as colunas necessárias)
@@ -131,42 +161,47 @@ export default function InventoryPage() {
                     setAvailableGases(gases.sort());
                 }
             } catch (error) {
-                console.error("Erro ao carregar filtros:", error);
+                handleError(error, "Erro ao carregar filtros");
             }
         };
         fetchFilters();
     }, []);
 
-    // Reset page when filters change
     useEffect(() => {
         setPage(0);
-    }, [searchTerm, statusFilter, brandFilter, voltageFilter, typeFilter, classFilter, gasFilter]);
+    }, [debouncedSearchTerm, statusFilter, brandFilter, voltageFilter, typeFilter, classFilter, gasFilter]);
 
-    const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [history, setHistory] = useState<ProductLog[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<InventoryProduct | null>(null);
-    const [deletingProduct, setDeletingProduct] = useState<InventoryProduct | null>(null);
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [deletingProduct, setDeletingProduct] = useState<InventoryRow | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isOpeningEdit, setIsOpeningEdit] = useState(false);
     const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
     const [zoom, setZoom] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const fetchInventorySeqRef = React.useRef(0);
+    const fetchHistorySeqRef = React.useRef(0);
 
     const fetchInventory = React.useCallback(async () => {
+        const requestId = ++fetchInventorySeqRef.current;
         setIsLoading(true);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000));
 
         try {
+            const safeSearch = sanitizeSearchTerm(debouncedSearchTerm);
+            const orSearch = safeSearch ? buildInventoryOrSearch(safeSearch) : null;
+
             let query = supabase
                 .from("products")
-                .select("*, orders(id, clients(name))", { count: 'exact' }) // Remove product_logs(*), keep orders join if needed or remove for perf
+                .select("id,internal_serial,original_serial,brand,model,voltage,product_type,market_class,refrigerant_gas,status,size,created_at,updated_at,order_id,photo_model,photo_product,photo_serial,photo_defect,has_water_dispenser,volume_total,orders(id,clients(name))", { count: 'exact' })
                 .order("created_at", { ascending: false })
                 .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-            if (searchTerm) {
-                query = query.or(`brand.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,internal_serial.ilike.%${searchTerm}%,original_serial.ilike.%${searchTerm}%,product_type.ilike.%${searchTerm}%,market_class.ilike.%${searchTerm}%,refrigerant_gas.ilike.%${searchTerm}%,voltage.ilike.%${searchTerm}%,pnc_ml.ilike.%${searchTerm}%,commercial_code.ilike.%${searchTerm}%`);
+            if (orSearch) {
+                query = query.or(orSearch);
             }
 
             if (statusFilter === "EM ESTOQUE") {
@@ -195,61 +230,86 @@ export default function InventoryPage() {
                 query = query.eq('refrigerant_gas', gasFilter);
             }
 
-            const result = await Promise.race([
-                query,
-                timeoutPromise
-            ]) as { data: any, count: number, error: any };
-
-            const { data, count, error: fetchError } = result;
+            const { data, count, error: fetchError } = await query;
 
             if (fetchError) throw fetchError;
+            if (requestId !== fetchInventorySeqRef.current) return;
 
-            setProducts((data as InventoryProduct[]) || []);
+            setProducts(((data as unknown) as InventoryRow[]) || []);
             setTotalCount(count || 0);
         } catch (error) {
-            handleError(error, "Erro ao carregar estoque");
+            if (requestId === fetchInventorySeqRef.current) handleError(error, "Erro ao carregar estoque");
         } finally {
-            setIsLoading(false);
+            if (requestId === fetchInventorySeqRef.current) setIsLoading(false);
         }
-    }, [page, searchTerm, statusFilter, brandFilter, voltageFilter, typeFilter, classFilter, gasFilter]);
+    }, [page, debouncedSearchTerm, statusFilter, brandFilter, voltageFilter, typeFilter, classFilter, gasFilter]);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchInventory();
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [page, searchTerm, statusFilter, brandFilter, voltageFilter, typeFilter, classFilter, gasFilter, fetchInventory]);
+        fetchInventory();
+    }, [page, debouncedSearchTerm, statusFilter, brandFilter, voltageFilter, typeFilter, classFilter, gasFilter, fetchInventory]);
 
     const toggleSelect = (id: string) => {
-        const newSelected = new Set(selectedIds);
-        if (newSelected.has(id)) newSelected.delete(id);
-        else newSelected.add(id);
-        setSelectedIds(newSelected);
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === products.length && products.length > 0) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(products.map(p => p.id)));
-        }
+        setSelectedIds(prev => {
+            if (prev.size === products.length && products.length > 0) return new Set();
+            return new Set(products.map(p => p.id));
+        });
     };
 
-    const fetchHistory = async (product: InventoryProduct) => {
-        setSelectedProduct(product);
+    const fetchHistory = async (product: InventoryRow) => {
+        const requestId = ++fetchHistorySeqRef.current;
+        setSelectedProduct(null);
         setIsLoadingHistory(true);
         try {
+            const { data: productDetails, error: productError } = await supabase
+                .from("products")
+                .select("*")
+                .eq("id", product.id)
+                .single();
+
+            if (productError) throw productError;
+            if (requestId !== fetchHistorySeqRef.current) return;
+            setSelectedProduct(productDetails as Product);
+
             const { data, error } = await supabase
                 .from("product_logs")
-                .select("*")
+                .select("id,product_id,actor_id,old_status,new_status,notes,checklist,data,created_at")
                 .eq("product_id", product.id)
                 .order("created_at", { ascending: false });
             if (error) throw error;
+            if (requestId !== fetchHistorySeqRef.current) return;
             setHistory((data as ProductLog[]) || []);
         } catch (error) {
-            handleError(error, "Falha ao carregar histórico");
+            if (requestId === fetchHistorySeqRef.current) handleError(error, "Falha ao carregar histórico");
         } finally {
-            setIsLoadingHistory(false);
+            if (requestId === fetchHistorySeqRef.current) setIsLoadingHistory(false);
+        }
+    };
+
+    const openEdit = async (productId: string) => {
+        if (!isAuthorized) return;
+        setIsOpeningEdit(true);
+        try {
+            const { data, error } = await supabase
+                .from("products")
+                .select("*")
+                .eq("id", productId)
+                .single();
+
+            if (error) throw error;
+            setEditingProduct(data as Product);
+        } catch (error) {
+            handleError(error, "Erro ao carregar dados do produto");
+        } finally {
+            setIsOpeningEdit(false);
         }
     };
 
@@ -258,34 +318,40 @@ export default function InventoryPage() {
         if (!editingProduct) return;
         setIsSaving(true);
         try {
-            const productSize = await calculateProductSize(editingProduct.volume_total);
-            const canonicalBrand = await resolveCanonicalBrand(editingProduct.brand);
+            const validated = validateAndSanitizeProductUpdate(editingProduct as any);
+            if (!validated.ok) {
+                toast.error("Dados inválidos", { description: validated.message });
+                return;
+            }
+
+            const productSize = await calculateProductSize(validated.data.volume_total || editingProduct.volume_total);
+            const canonicalBrand = await resolveCanonicalBrand(validated.data.brand || editingProduct.brand);
             const { error: updateError } = await supabase
                 .from("products")
                 .update({
                     brand: canonicalBrand,
-                    model: editingProduct.model,
-                    original_serial: editingProduct.original_serial,
-                    voltage: editingProduct.voltage,
-                    commercial_code: editingProduct.commercial_code,
-                    color: editingProduct.color,
-                    product_type: editingProduct.product_type,
-                    pnc_ml: editingProduct.pnc_ml,
-                    manufacturing_date: editingProduct.manufacturing_date,
-                    market_class: editingProduct.market_class,
-                    refrigerant_gas: editingProduct.refrigerant_gas,
-                    gas_charge: editingProduct.gas_charge,
-                    compressor: editingProduct.compressor,
-                    volume_freezer: editingProduct.volume_freezer,
-                    volume_refrigerator: editingProduct.volume_refrigerator,
-                    volume_total: editingProduct.volume_total,
-                    pressure_high_low: editingProduct.pressure_high_low,
-                    freezing_capacity: editingProduct.freezing_capacity,
-                    electric_current: editingProduct.electric_current,
-                    defrost_power: editingProduct.defrost_power,
-                    frequency: editingProduct.frequency,
+                    model: validated.data.model,
+                    original_serial: validated.data.original_serial,
+                    voltage: validated.data.voltage,
+                    commercial_code: validated.data.commercial_code,
+                    color: validated.data.color,
+                    product_type: validated.data.product_type,
+                    pnc_ml: validated.data.pnc_ml,
+                    manufacturing_date: validated.data.manufacturing_date,
+                    market_class: validated.data.market_class,
+                    refrigerant_gas: validated.data.refrigerant_gas,
+                    gas_charge: validated.data.gas_charge,
+                    compressor: validated.data.compressor,
+                    volume_freezer: validated.data.volume_freezer,
+                    volume_refrigerator: validated.data.volume_refrigerator,
+                    volume_total: validated.data.volume_total,
+                    pressure_high_low: validated.data.pressure_high_low,
+                    freezing_capacity: validated.data.freezing_capacity,
+                    electric_current: validated.data.electric_current,
+                    defrost_power: validated.data.defrost_power,
+                    frequency: validated.data.frequency,
                     size: productSize,
-                    status: editingProduct.status,
+                    status: validated.data.status,
                 })
                 .eq("id", editingProduct.id);
             if (updateError) throw updateError;
@@ -711,7 +777,8 @@ export default function InventoryPage() {
                                                     {isAuthorized && (
                                                         <>
                                                             <button
-                                                                onClick={() => setEditingProduct({ ...p })}
+                                                                onClick={() => openEdit(p.id)}
+                                                                disabled={isOpeningEdit || isSaving}
                                                                 className="h-12 w-12 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:bg-white/10 transition-all border border-border/10"
                                                             >
                                                                 <Edit2 className="h-4 w-4" />
@@ -858,7 +925,8 @@ export default function InventoryPage() {
                                                                 {isAuthorized && (
                                                                     <>
                                                                         <button
-                                                                            onClick={() => setEditingProduct({ ...p })}
+                                                                            onClick={() => openEdit(p.id)}
+                                                                            disabled={isOpeningEdit || isSaving}
                                                                             className="h-8 w-8 sm:h-10 sm:w-10 flex items-center justify-center rounded-lg sm:rounded-xl bg-foreground/5 text-muted-foreground hover:bg-white hover:text-black transition-all border border-border/20 shadow-inner group/btn"
                                                                             title="Editar Ativo"
                                                                         >
@@ -1233,8 +1301,9 @@ export default function InventoryPage() {
                                         <div className="hidden sm:flex items-center gap-2 mr-4">
                                             <button
                                                 onClick={() => {
-                                                    setEditingProduct({ ...selectedProduct });
+                                                    openEdit(selectedProduct.id);
                                                 }}
+                                                disabled={isOpeningEdit || isSaving}
                                                 className="h-10 px-4 rounded-xl bg-foreground/5 text-xs font-bold hover:bg-foreground/10 transition-all border border-border/20 text-foreground"
                                             >
                                                 Editar Ativo

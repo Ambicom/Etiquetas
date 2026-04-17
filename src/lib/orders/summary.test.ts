@@ -19,5 +19,25 @@ describe("orders/summary", () => {
         expect(bySize.get("Grande")?.qty).toBe(1);
         expect(bySize.get("Médio")?.qty).toBe(1);
     });
-});
 
+    it("retorna vazio quando não há itens", () => {
+        const summary = buildOrderSummaryBySize({ order_items: [] });
+        expect(summary.rows).toEqual([]);
+        expect(summary.grandTotal).toBe(0);
+    });
+
+    it("ignora itens sem produto e agrega Não informado quando tamanho é nulo", () => {
+        const summary = buildOrderSummaryBySize({
+            order_items: [
+                { unit_price: 0, products: null },
+                { unit_price: 0, products: { size: null, has_water_dispenser: false } },
+                { unit_price: 15, products: { size: null, has_water_dispenser: false } }
+            ]
+        });
+
+        const row = summary.rows.find(r => r.size === "Não informado");
+        expect(row?.qty).toBe(2);
+        expect(row?.unit).toBe(15);
+        expect(summary.grandTotal).toBe(15);
+    });
+});

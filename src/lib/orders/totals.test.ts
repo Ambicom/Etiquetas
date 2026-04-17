@@ -13,5 +13,8 @@ describe("orders/totals", () => {
     it("identifica erro de RPC ausente por mensagem", () => {
         expect(isMissingRpcError({ message: "Could not find the function public.recalculate_order_total(p_order_id) in the schema cache" })).toBe(true);
     });
-});
 
+    it("retorna false quando não é erro de RPC ausente", () => {
+        expect(isMissingRpcError({ code: "OTHER", message: "x" })).toBe(false);
+    });
+});
