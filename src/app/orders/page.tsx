@@ -31,6 +31,10 @@ import { Order, Client, Product } from "@/lib/types";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { logger } from "@/lib/logger";
 import { formatProductSizeForLabel } from "@/lib/product-utils";
+import { getUnitPriceForClientAndSize } from "@/lib/orders/pricing";
+import { calculateItemsTotal, isMissingRpcError } from "@/lib/orders/totals";
+import { fetchClientPricingById } from "@/lib/orders/clients";
+import { buildOrderSummaryBySize } from "@/lib/orders/summary";
 
 const statusStyles = {
     PENDENTE: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
@@ -98,19 +102,6 @@ function formatCurrencyBRL(value: number | null | undefined): string {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(normalized);
 }
 
-function calculateItemsTotal(items?: Array<{ unit_price?: number | null }>): number {
-    return (items || []).reduce((acc, item) => acc + Number(item.unit_price || 0), 0);
-}
-
-function getUnitPriceForClientAndSize(client: any, sizeLabel: string | null | undefined): number {
-    const normalized = (sizeLabel || "").trim();
-    if (normalized === "Pequeno") return Number(client?.price_small || 0) || 0;
-    if (normalized === "Médio" || normalized === "Medio") return Number(client?.price_medium || 0) || 0;
-    if (normalized === "Grande") return Number(client?.price_large || 0) || 0;
-    if (normalized === "Grande/A") return Number(client?.price_large_a || 0) || 0;
-    return 0;
-}
-
 function formatOrderCode(orderId: string): string {
     const short = (orderId || "").split("-")[0] || "";
     return short.toUpperCase();
@@ -121,46 +112,7 @@ function safeText(value: unknown, fallback: string): string {
     return text ? text : fallback;
 }
 
-function buildOrderSummaryBySize(order: OrderDetails) {
-    const items = (order.order_items || [])
-        .map(i => ({
-            unitPrice: Number(i.unit_price || 0),
-            product: i.products || null
-        }))
-        .filter(i => i.product);
-
-    const orderKey: Record<string, number> = {
-        Pequeno: 1,
-        "Médio": 2,
-        Medio: 2,
-        Grande: 3,
-        "Grande/A": 4
-    };
-
-    const map = new Map<string, { size: string; qty: number; unit: number; total: number }>();
-
-    for (const item of items) {
-        const sizeRaw = (item.product as any)?.size as string | null | undefined;
-        const hasWater = Boolean((item.product as any)?.has_water_dispenser);
-        const sizeLabel = formatProductSizeForLabel(sizeRaw ?? null, hasWater) || "Não informado";
-
-        const current = map.get(sizeLabel) || { size: sizeLabel, qty: 0, unit: item.unitPrice, total: 0 };
-        current.qty += 1;
-        current.total += item.unitPrice;
-        if (!current.unit && item.unitPrice) current.unit = item.unitPrice;
-        map.set(sizeLabel, current);
-    }
-
-    const rows = Array.from(map.values()).sort((a, b) => {
-        const ka = orderKey[a.size] ?? 999;
-        const kb = orderKey[b.size] ?? 999;
-        if (ka !== kb) return ka - kb;
-        return a.size.localeCompare(b.size, "pt-BR");
-    });
-
-    const grandTotal = rows.reduce((acc, r) => acc + r.total, 0);
-    return { rows, grandTotal };
-}
+ 
 
 function OrderPdfDocument({ order, issuedAt }: { order: OrderDetails; issuedAt: Date }) {
     const client = (order as any).clients || {};
@@ -293,6 +245,8 @@ export default function OrdersPage() {
     const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
     const [isPreparingPdfPreview, setIsPreparingPdfPreview] = useState(false);
     const pdfPrintableRef = useRef<HTMLDivElement | null>(null);
+    const clientPricingCacheRef = useRef<Map<string, any>>(new Map());
+    const viewOrderRequestSeqRef = useRef(0);
 
 
 
@@ -393,7 +347,7 @@ export default function OrdersPage() {
         handleAddProductToOrder(code);
     };
 
-    const ensureClientPricing = async (order: Order): Promise<any | null> => {
+    const ensureClientPricing = async (order: Order | OrderDetails): Promise<any | null> => {
         const currentClient = (order as any)?.clients;
         const hasPricing = currentClient && (
             currentClient.price_small !== undefined ||
@@ -407,14 +361,12 @@ export default function OrdersPage() {
         const clientId = (order as any)?.client_id;
         if (!clientId) return currentClient || null;
 
-        const { data, error } = await supabase
-            .from("clients")
-            .select("*")
-            .eq("id", clientId)
-            .maybeSingle();
+        const cached = clientPricingCacheRef.current.get(clientId);
+        if (cached) return cached;
 
-        if (error) throw error;
-        return data || currentClient || null;
+        const fetched = await fetchClientPricingById(supabase as any, clientId);
+        if (fetched) clientPricingCacheRef.current.set(clientId, fetched);
+        return fetched || currentClient || null;
     };
 
     const handleAddProductToOrder = async (code: string) => {
@@ -440,6 +392,7 @@ export default function OrdersPage() {
         }
 
 
+        let reservedProductId: string | null = null;
         try {
             // First find the product regardless of status to give better feedback
             const { data: productData, error: productError } = await supabase
@@ -486,12 +439,29 @@ export default function OrdersPage() {
             const sizeLabel = formatProductSizeForLabel(product.size, product.has_water_dispenser) || product.size;
             const unitPrice = getUnitPriceForClientAndSize(client, sizeLabel);
 
+            if (!client) {
+                toast.error("Cliente não encontrado para este pedido.", {
+                    description: "Selecione um cliente válido e tente novamente."
+                });
+                setMountingScanInput("");
+                return;
+            }
+
+            if (!(unitPrice > 0)) {
+                toast.error("Preço não configurado para este cliente.", {
+                    description: `Tamanho: ${sizeLabel || "Não informado"}`
+                });
+                setMountingScanInput("");
+                return;
+            }
+
             const { error: updateError } = await supabase
                 .from("products")
                 .update({ order_id: selectedOrder.id })
                 .eq("id", product.id);
 
             if (updateError) throw updateError;
+            reservedProductId = product.id;
 
             const { error: insertError } = await supabase
                 .from("order_items")
@@ -502,6 +472,7 @@ export default function OrdersPage() {
                 }]);
 
             if (insertError) throw insertError;
+            reservedProductId = null;
 
             toast.success("Produto adicionado!", {
                 description: `${product.brand} ${product.model} - R$ ${unitPrice.toFixed(2)}`
@@ -514,6 +485,16 @@ export default function OrdersPage() {
             fetchOrders(true);
         } catch (err) {
             logger.error("Erro ao buscar/adicionar produto:", err);
+            if (reservedProductId) {
+                try {
+                    await supabase
+                        .from("products")
+                        .update({ order_id: null })
+                        .eq("id", reservedProductId);
+                } catch (rollbackError) {
+                    logger.error("Erro ao reverter reserva do produto:", rollbackError);
+                }
+            }
             toast.error("Erro ao buscar produto.");
         }
     };
@@ -530,18 +511,48 @@ export default function OrdersPage() {
 
         if (!hasDrift) return storedTotal;
 
-        const { data: rpcData, error: rpcError } = await supabase
-            .rpc("recalculate_order_total", { p_order_id: orderId });
+        try {
+            const { data: rpcData, error: rpcError } = await supabase
+                .rpc("recalculate_order_total", { p_order_id: orderId });
 
-        if (rpcError) throw rpcError;
+            if (rpcError) {
+                if (!isMissingRpcError(rpcError)) throw rpcError;
 
-        if (!silent) {
-            toast.info("Total do pedido auto-sincronizado.", {
-                description: "Detectamos divergência e ajustamos o valor com base nos itens."
-            });
+                const { error: updateTotalError } = await supabase
+                    .from("orders")
+                    .update({ total_amount: recalculatedTotal })
+                    .eq("id", orderId);
+
+                if (updateTotalError) throw updateTotalError;
+
+                if (!silent) {
+                    toast.warning("Total sincronizado sem função RPC.", {
+                        description: "A função do banco ainda não foi aplicada; usamos fallback para manter o total correto."
+                    });
+                }
+
+                return recalculatedTotal;
+            }
+
+            if (!silent) {
+                toast.info("Total do pedido auto-sincronizado.", {
+                    description: "Detectamos divergência e ajustamos o valor com base nos itens."
+                });
+            }
+
+            return Number(rpcData ?? recalculatedTotal);
+        } catch (err) {
+            logger.error("Erro ao sincronizar total do pedido:", err);
+            try {
+                await supabase
+                    .from("orders")
+                    .update({ total_amount: recalculatedTotal })
+                    .eq("id", orderId);
+            } catch (fallbackError) {
+                logger.error("Erro ao aplicar fallback de total do pedido:", fallbackError);
+            }
+            return recalculatedTotal;
         }
-
-        return Number(rpcData ?? recalculatedTotal);
     };
 
     const handleRemoveItemFromOrder = async (itemId: string, productId?: string | null) => {
@@ -821,6 +832,7 @@ export default function OrdersPage() {
     };
 
     const handleViewOrder = async (order: Order, silent: boolean = false) => {
+        const requestId = ++viewOrderRequestSeqRef.current;
         setShowDetailsModal(true);
         if (!silent) setIsFetchingDetails(true);
         setSelectedOrder(prev => (silent && prev?.id === order.id ? prev : order));
@@ -840,44 +852,41 @@ export default function OrdersPage() {
                 .single();
 
             if (error) throw error;
-            const detailedOrder = data as Order;
+            if (requestId !== viewOrderRequestSeqRef.current) return;
+            const detailedOrder = data as OrderDetails;
 
             const client = await ensureClientPricing(detailedOrder);
+            if (requestId !== viewOrderRequestSeqRef.current) return;
             const itemsToFix = (detailedOrder.order_items || []).filter((item: any) => {
                 const current = Number(item?.unit_price || 0);
                 return current <= 0 && item?.products;
             });
 
             if (client && itemsToFix.length > 0 && detailedOrder.status === "PENDENTE") {
-                await Promise.all(itemsToFix.map(async (item: any) => {
-                    const sizeLabel = formatProductSizeForLabel(item.products?.size, item.products?.has_water_dispenser) || item.products?.size;
+                const updates: Array<{ id: string; unit_price: number }> = [];
+                const expectedById = new Map<string, number>();
+                for (const item of itemsToFix) {
+                    const productAny = item.products as any;
+                    const sizeLabel = formatProductSizeForLabel(productAny?.size, productAny?.has_water_dispenser) || productAny?.size;
                     const expected = getUnitPriceForClientAndSize(client, sizeLabel);
-                    if (!(expected > 0)) return;
-                    const { error: updateItemError } = await supabase
+                    if (!(expected > 0)) continue;
+                    updates.push({ id: item.id, unit_price: expected });
+                    expectedById.set(item.id, expected);
+                }
+
+                if (updates.length > 0) {
+                    const { error: updateItemsError } = await supabase
                         .from("order_items")
-                        .update({ unit_price: expected })
-                        .eq("id", item.id);
-                    if (updateItemError) throw updateItemError;
-                }));
+                        .upsert(updates, { onConflict: "id" });
+                    if (updateItemsError) throw updateItemsError;
+                    if (requestId !== viewOrderRequestSeqRef.current) return;
 
-                const { data: refreshed, error: refreshError } = await supabase
-                    .from("orders")
-                    .select(`
-                        *,
-                        clients (*),
-                        order_items (
-                            id,
-                            unit_price,
-                            products (*)
-                        )
-                    `)
-                    .eq("id", order.id)
-                    .single();
-
-                if (refreshError) throw refreshError;
-                (detailedOrder as any).order_items = (refreshed as any)?.order_items || (detailedOrder as any).order_items;
-                (detailedOrder as any).clients = (refreshed as any)?.clients || (detailedOrder as any).clients;
-                (detailedOrder as any).total_amount = (refreshed as any)?.total_amount ?? (detailedOrder as any).total_amount;
+                    (detailedOrder as any).order_items = (detailedOrder as any).order_items?.map((item: any) => {
+                        const expected = expectedById.get(item.id);
+                        if (!expected) return item;
+                        return { ...item, unit_price: expected };
+                    });
+                }
             }
             const syncedTotal = await syncOrderTotalIfNeeded(
                 detailedOrder.id,
@@ -885,6 +894,7 @@ export default function OrdersPage() {
                 detailedOrder.total_amount,
                 silent
             );
+            if (requestId !== viewOrderRequestSeqRef.current) return;
             setSelectedOrder({
                 ...detailedOrder,
                 total_amount: syncedTotal
@@ -893,7 +903,7 @@ export default function OrdersPage() {
             logger.error("Erro ao buscar detalhes do pedido:", error);
             toast.error("Erro ao carregar detalhes do pedido");
         } finally {
-            setIsFetchingDetails(false);
+            if (requestId === viewOrderRequestSeqRef.current) setIsFetchingDetails(false);
         }
     };
 
