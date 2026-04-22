@@ -758,73 +758,90 @@ export default function OrdersPage() {
             return;
         }
 
-        const iframe = document.createElement("iframe");
-        iframe.style.position = "fixed";
-        iframe.style.right = "0";
-        iframe.style.bottom = "0";
-        iframe.style.width = "0";
-        iframe.style.height = "0";
-        iframe.style.border = "0";
-        iframe.setAttribute("aria-hidden", "true");
-        document.body.appendChild(iframe);
+        const title = pdfPreviewOrder ? `Pedido_${formatOrderCode(pdfPreviewOrder.id)}` : "Pedido";
+        const htmlContent = content.innerHTML;
 
-        const doc = iframe.contentDocument;
-        const win = iframe.contentWindow;
-        if (!doc || !win) {
-            iframe.remove();
-            toast.error("Impressão indisponível neste navegador.");
+        // Abre uma nova janela/aba dedicada para impressão.
+        // No Chrome mobile, iframe.contentWindow.print() imprime a página principal,
+        // então precisamos de uma janela dedicada com APENAS o relatório.
+        const printWindow = window.open("", "_blank");
+
+        if (!printWindow) {
+            // Fallback: se popup bloqueado, tenta via iframe (desktop geralmente funciona)
+            const iframe = document.createElement("iframe");
+            iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+            iframe.setAttribute("aria-hidden", "true");
+            document.body.appendChild(iframe);
+
+            const iframeDoc = iframe.contentDocument;
+            const iframeWin = iframe.contentWindow;
+            if (!iframeDoc || !iframeWin) {
+                iframe.remove();
+                toast.error("Impressão indisponível neste navegador.");
+                return;
+            }
+
+            iframeDoc.open();
+            iframeDoc.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=1024"><title>${title}</title><style>${ORDER_PDF_CSS}</style></head><body>${htmlContent}</body></html>`);
+            iframeDoc.close();
+
+            const images = Array.from(iframeDoc.images || []);
+            if (images.length > 0) {
+                await Promise.all(images.map(img => new Promise<void>(resolve => {
+                    if (img.complete) { resolve(); return; }
+                    const onDone = () => { img.removeEventListener("load", onDone); img.removeEventListener("error", onDone); resolve(); };
+                    img.addEventListener("load", onDone);
+                    img.addEventListener("error", onDone);
+                })));
+            }
+
+            iframeWin.addEventListener("afterprint", () => iframe.remove());
+            setTimeout(() => { try { iframeWin.focus(); iframeWin.print(); } catch { iframe.remove(); toast.error("Falha ao abrir diálogo de impressão."); } }, 300);
             return;
         }
 
-        const title = pdfPreviewOrder ? `Pedido_${formatOrderCode(pdfPreviewOrder.id)}` : "Pedido";
-        doc.open();
-        // Usamos um viewport fixo de 1024px no iframe para garantir que o layout desktop (A4) 
-        // seja renderizado corretamente antes da escala de impressão no mobile.
-        doc.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=1024"><title>${title}</title><style>${ORDER_PDF_CSS}</style></head><body></body></html>`);
-        doc.close();
-        doc.body.innerHTML = content.innerHTML;
+        // Janela dedicada abriu com sucesso — escreve APENAS o relatório
+        printWindow.document.open();
+        printWindow.document.write(`<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=1024">
+    <title>${title}</title>
+    <style>${ORDER_PDF_CSS}</style>
+</head>
+<body>
+    ${htmlContent}
+</body>
+</html>`);
+        printWindow.document.close();
 
-        const images = Array.from(doc.images || []);
+        // Aguarda imagens carregarem
+        const images = Array.from(printWindow.document.images || []);
         if (images.length > 0) {
-            await Promise.all(images.map((img) => new Promise<void>((resolve) => {
-                if (img.complete) {
-                    resolve();
-                    return;
-                }
-                const onDone = () => {
-                    img.removeEventListener("load", onDone);
-                    img.removeEventListener("error", onDone);
-                    resolve();
-                };
+            await Promise.all(images.map(img => new Promise<void>(resolve => {
+                if (img.complete) { resolve(); return; }
+                const onDone = () => { img.removeEventListener("load", onDone); img.removeEventListener("error", onDone); resolve(); };
                 img.addEventListener("load", onDone);
                 img.addEventListener("error", onDone);
             })));
         }
 
-        const cleanup = () => {
-            iframe.remove();
-        };
+        // Fecha a janela automaticamente após impressão
+        printWindow.addEventListener("afterprint", () => {
+            printWindow.close();
+        });
 
-        const onAfterPrint = () => {
-            win.removeEventListener("afterprint", onAfterPrint);
-            cleanup();
-        };
-        win.addEventListener("afterprint", onAfterPrint);
-
+        // Dispara a impressão após o conteúdo estar totalmente carregado
         setTimeout(() => {
             try {
-                win.focus();
-                // Pequeno delay adicional para garantir que o foco foi aplicado
-                setTimeout(() => {
-                    win.print();
-                    // Removido o cleanup imediato para deixar o diálogo de impressão aberto
-                    // O win.addEventListener("afterprint") já cuida da limpeza
-                }, 50);
+                printWindow.focus();
+                printWindow.print();
             } catch (e) {
-                cleanup();
+                logger.error("Erro ao imprimir:", e);
                 toast.error("Falha ao abrir diálogo de impressão.");
             }
-        }, 250);
+        }, 400);
     };
 
     const handleExportPDF = async (order?: Order) => {

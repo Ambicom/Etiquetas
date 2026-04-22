@@ -50,9 +50,11 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.12**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.13**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.13**:
+    - **Impressão Isolada via Nova Janela**: Substituição completa do método de impressão. Antes usava `iframe.contentWindow.print()`, que no Chrome mobile imprime a página principal (incluindo o modal e o layout da aplicação). Agora abre uma janela/aba dedicada (`window.open`) contendo APENAS o HTML do relatório, eliminando completamente os elementos da interface na impressão. Mantém fallback via iframe para desktop.
   - **v2.32.12**:
     - **Alinhamento de Impressão e Quebra de Página**: Correção definitiva dos cortes laterais na impressão. O conteúdo agora ocupa 100% da área útil da folha A4 (com margens físicas de 12mm/10mm definidas no `@page`). Tabelas com muitos itens agora quebram automaticamente entre páginas, repetindo o cabeçalho em cada folha. Layout fixo (`table-layout: fixed`) previne estouro horizontal de colunas.
   - **v2.32.11**:
