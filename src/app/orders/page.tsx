@@ -118,9 +118,23 @@ body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background:
 
 @media screen {
   body { background: transparent; }
-  .order-pdf-page { width: 794px; min-height: 1123px; color: #111827 !important; background-color: #ffffff !important; }
-  .order-pdf-card { padding: 56px; }
+  .order-pdf-page { 
+    width: 210mm; 
+    min-height: 297mm; 
+    color: #111827 !important; 
+    background-color: #ffffff !important; 
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transform-origin: top center;
+  }
+  .order-pdf-card { padding: 14mm; }
   .order-pdf-logo { height: 52px; }
+}
+
+/* Responsividade para o preview em telas muito pequenas */
+@media screen and (max-width: 640px) {
+  .order-pdf-page {
+    /* Permite que o container pai controle a rolagem, mantendo o tamanho fixo para fidelidade */
+  }
 }
 `;
 
@@ -1830,7 +1844,7 @@ export default function OrdersPage() {
                     <div className="glass-card w-full max-w-6xl max-h-[95vh] overflow-hidden border-border/20 shadow-2xl bg-card/95 relative flex flex-col">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
 
-                        <div className="p-4 sm:p-6 border-b border-border/20 flex items-center justify-between gap-4 shrink-0 no-print">
+                        <div className="p-4 sm:p-6 border-b border-border/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0 no-print">
                             <div className="min-w-0">
                                 <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight flex items-center gap-2">
                                     <Eye className="h-5 w-5 text-primary" />
@@ -1840,11 +1854,11 @@ export default function OrdersPage() {
                                     Revise antes de imprimir/salvar como PDF
                                 </p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 mt-2 sm:mt-0">
                                 <button
                                     onClick={handlePrintPdfPreview}
                                     disabled={isPreparingPdfPreview}
-                                    className="h-11 sm:h-12 px-4 sm:px-6 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2 text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-xl shadow-primary/20"
+                                    className="flex-1 sm:flex-none h-11 sm:h-12 px-4 sm:px-6 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-all active:scale-95 flex items-center justify-center gap-2 text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-xl shadow-primary/20"
                                 >
                                     <Printer className="h-4 w-4" />
                                     Imprimir / Salvar PDF
@@ -1863,10 +1877,10 @@ export default function OrdersPage() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-foreground/5 p-3 sm:p-6">
-                            <div className="mx-auto w-full max-w-[920px]">
+                        <div className="flex-1 overflow-auto custom-scrollbar bg-foreground/5 p-3 sm:p-6">
+                            <div className="mx-auto w-fit">
                                 <div className="rounded-2xl border border-border/20 bg-white shadow-2xl overflow-hidden">
-                                    <div ref={pdfPrintableRef}>
+                                    <div ref={pdfPrintableRef} className="bg-white">
                                         <OrderPdfDocument order={pdfPreviewOrder} issuedAt={pdfPreviewIssuedAt} />
                                     </div>
                                 </div>

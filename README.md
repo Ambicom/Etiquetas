@@ -50,9 +50,11 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.9**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.10**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.10**:
+    - **Ajuste de Visualização Mobile (Preview)**: Correção do layout do cabeçalho do preview e implementação de rolagem horizontal no container do documento. Agora, o relatório mantém as dimensões A4 reais sem cortes, permitindo navegação completa em telas pequenas.
   - **v2.32.9**:
     - **Otimização de Impressão Mobile**: Correção do problema de corte do relatório em dispositivos móveis. Implementação de viewport fixo (1024px) no iframe de impressão para garantir a renderização correta do layout A4 e ajuste das margens e dimensões no CSS `@media print`.
   - **v2.32.8**:
