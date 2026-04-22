@@ -58,7 +58,7 @@ type OrderDetails = Order & {
     }>;
 };
 
-const ORDER_PDF_LOGO_URL = "https://ambicom.com.br/wp-content/uploads/2019/03/logoambicom.jpg";
+const ORDER_PDF_LOGO_URL = "/logoambicom.jpg";
 
 const ORDER_PDF_CSS = `
 /* ═══ Página física ═══ */
