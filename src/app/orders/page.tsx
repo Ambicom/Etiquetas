@@ -772,20 +772,20 @@ export default function OrdersPage() {
         const margin = 14;
         const contentWidth = pageWidth - margin * 2;
 
-        // ══ Logo (tenta carregar, se falhar pula) ══
+        // ══ Logo (carrega via fetch como blob para evitar CORS) ══
         try {
-            const logoImg = new Image();
-            logoImg.crossOrigin = "anonymous";
-            await new Promise<void>((resolve) => {
-                logoImg.onload = () => resolve();
-                logoImg.onerror = () => resolve();
-                logoImg.src = ORDER_PDF_LOGO_URL;
-                setTimeout(resolve, 3000); // timeout de 3s
-            });
-            if (logoImg.complete && logoImg.naturalWidth > 0) {
-                doc.addImage(logoImg, "JPEG", pageWidth - margin - 40, margin, 40, 14);
+            const logoResponse = await fetch(ORDER_PDF_LOGO_URL);
+            if (logoResponse.ok) {
+                const logoBlob = await logoResponse.blob();
+                const logoDataUrl = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(logoBlob);
+                });
+                doc.addImage(logoDataUrl, "JPEG", pageWidth - margin - 40, margin, 40, 14);
             }
-        } catch { /* logo opcional */ }
+        } catch { /* logo opcional, continua sem ele */ }
 
         // ══ Título ══
         let y = margin;
