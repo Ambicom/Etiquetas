@@ -50,9 +50,11 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.6**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.7**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.7**:
+    - **Otimização de Modal Mobile**: Ajuste no alinhamento vertical (`items-start`) para garantir que o cabeçalho do modal de clientes nunca seja cortado em telas de baixa resolução, mantendo a centralização apenas em tablets e computadores.
   - **v2.32.6**:
     - **Responsividade Mobile**: Correção na centralização e visibilidade do modal de gestão de clientes em dispositivos móveis. Implementação de container de rolagem e ajuste no empilhamento de campos para garantir acesso completo aos botões e ao cabeçalho.
   - **v2.32.5**:

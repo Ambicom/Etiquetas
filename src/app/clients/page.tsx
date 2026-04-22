@@ -428,9 +428,9 @@ export default function ClientsPage() {
 
         {/* Modal de Cadastro/Edição */}
         {showModal && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md animate-in fade-in duration-500 overflow-y-auto py-10 sm:py-20 flex items-center justify-center">
-            <div className="min-h-full w-full flex items-center justify-center p-4">
-              <div className="glass-card w-full max-w-lg space-y-6 sm:space-y-8 border-border/20 shadow-2xl p-6 sm:p-10 bg-card/95 relative overflow-hidden my-auto">
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md animate-in fade-in duration-500 overflow-y-auto">
+            <div className="min-h-full flex items-start sm:items-center justify-center p-4 sm:p-6 py-12 sm:py-20">
+              <div className="glass-card w-full max-w-lg space-y-6 sm:space-y-8 border-border/20 shadow-2xl p-6 sm:p-10 bg-card/95 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
                 <div className="flex items-center justify-between relative">
