@@ -61,50 +61,63 @@ type OrderDetails = Order & {
 const ORDER_PDF_LOGO_URL = "https://ambicom.com.br/wp-content/uploads/2019/03/logoambicom.jpg";
 
 const ORDER_PDF_CSS = `
+/* ═══ Página física ═══ */
 @page { 
   size: A4; 
-  margin: 8mm; 
+  margin: 12mm 10mm; 
 }
 
+/* ═══ Estilos de Impressão ═══ */
 @media print {
   html, body {
     background: #fff !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 210mm !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   
+  /* O conteúdo ocupa 100% da área útil definida por @page */
   .order-pdf-page { 
-    width: 210mm !important; 
-    min-height: 280mm !important; 
-    margin: 0 auto !important; 
+    width: 100% !important; 
+    min-height: auto !important;
+    margin: 0 !important; 
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
     display: block !important;
     background: #fff !important;
     transform: none !important;
+    overflow: visible !important;
   }
 
   .order-pdf-card {
-    border: 2px solid #111827 !important;
+    border: 1.5px solid #333 !important;
+    padding: 6mm !important;
     background: #fff !important;
     box-shadow: none !important;
+    page-break-inside: auto;
   }
 
-  /* Força a remoção de qualquer sombra ou borda de modal que possa vazar */
-  .glass-card, .rounded-2xl {
-    box-shadow: none !important;
-    border-color: #111827 !important;
-  }
+  /* Garante que a tabela de itens quebre entre páginas */
+  .order-pdf-table { page-break-inside: auto; }
+  .order-pdf-table tr { page-break-inside: avoid; page-break-after: auto; }
+  .order-pdf-table thead { display: table-header-group; } /* repete cabeçalho em cada página */
+
+  /* Seção de resumo nunca quebra no meio */
+  .order-pdf-summary { page-break-inside: avoid; }
+
+  /* Remove qualquer artefato visual da UI */
+  .glass-card, .rounded-2xl { box-shadow: none !important; }
 
   /* Oculta interface do sistema */
-  header, footer, nav, button, .no-print, [role="dialog"] > *:not(.order-pdf-page) { 
+  header, footer, nav, button, .no-print { 
     display: none !important; 
   }
 }
 
-/* Base Styles (Shared) */
+/* ═══ Base (compartilhado entre tela e impressão) ═══ */
 html, body { padding: 0; margin: 0; }
 * { box-sizing: border-box; }
 .order-pdf-page { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #111827 !important; background-color: #ffffff !important; }
@@ -113,19 +126,22 @@ html, body { padding: 0; margin: 0; }
 .order-pdf-logo { height: 14mm; width: auto; object-fit: contain; }
 .order-pdf-title { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; margin: 0; color: #111827 !important; }
 .order-pdf-meta { margin-top: 4px; font-size: 10px; color: #111827 !important; display: flex; gap: 8px; flex-wrap: wrap; }
-.order-pdf-section { margin-top: 8mm; break-inside: avoid; color: #111827 !important; }
+.order-pdf-section { margin-top: 8mm; color: #111827 !important; }
 .order-pdf-section-title { display: flex; align-items: center; gap: 6px; margin: 0 0 4mm; font-size: 12px; font-weight: 800; color: #111827 !important; }
-.order-pdf-kv { display: grid; grid-template-columns: 140px 1fr; row-gap: 4px; column-gap: 8px; font-size: 11px; color: #111827 !important; }
+.order-pdf-kv { display: grid; grid-template-columns: 130px 1fr; row-gap: 4px; column-gap: 8px; font-size: 11px; color: #111827 !important; }
 .order-pdf-k { font-weight: 800; color: #111827 !important; }
-.order-pdf-v { font-weight: 600; color: #111827 !important; }
-.order-pdf-table { width: 100%; border-collapse: collapse; font-size: 10px; color: #111827 !important; }
-.order-pdf-table th, .order-pdf-table td { border: 1.5px solid #111827; padding: 4px 6px; vertical-align: top; color: #111827 !important; }
+.order-pdf-v { font-weight: 600; color: #111827 !important; word-break: break-word; }
+.order-pdf-table { width: 100%; border-collapse: collapse; font-size: 10px; color: #111827 !important; table-layout: fixed; }
+.order-pdf-table th, .order-pdf-table td { border: 1.5px solid #111827; padding: 4px 6px; vertical-align: top; color: #111827 !important; overflow: hidden; text-overflow: ellipsis; }
 .order-pdf-table th { font-weight: 900; background: #f9fafb !important; }
+.order-pdf-table thead { display: table-header-group; }
+.order-pdf-table tr { break-inside: avoid; }
 .order-pdf-summary { margin-top: 6mm; break-inside: avoid; }
 .order-pdf-right { text-align: right; }
-.order-pdf-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.order-pdf-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 9px; }
 .order-pdf-total-row td { font-weight: 900; background: #f9fafb !important; }
 
+/* ═══ Apenas Tela (Preview) ═══ */
 @media screen {
   body { background: transparent; }
   .order-pdf-page { 
@@ -133,7 +149,7 @@ html, body { padding: 0; margin: 0; }
     min-height: 297mm; 
     background-color: #ffffff !important; 
     box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
-    margin: 20px auto;
+    margin: 0 auto;
   }
 }
 `;

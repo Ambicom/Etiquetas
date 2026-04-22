@@ -50,9 +50,11 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.11**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.12**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.12**:
+    - **Alinhamento de Impressão e Quebra de Página**: Correção definitiva dos cortes laterais na impressão. O conteúdo agora ocupa 100% da área útil da folha A4 (com margens físicas de 12mm/10mm definidas no `@page`). Tabelas com muitos itens agora quebram automaticamente entre páginas, repetindo o cabeçalho em cada folha. Layout fixo (`table-layout: fixed`) previne estouro horizontal de colunas.
   - **v2.32.11**:
     - **Remoção de Sombras na Impressão**: Limpeza total dos estilos de interface (sombras, bordas de modal e fundos cinzas) que vazavam para o documento impresso. Implementação de margens de segurança físicas (8mm) para evitar cortes nas bordas do papel em impressoras e drivers mobile.
   - **v2.32.10**:
