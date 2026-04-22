@@ -61,7 +61,32 @@ type OrderDetails = Order & {
 const ORDER_PDF_LOGO_URL = "https://ambicom.com.br/wp-content/uploads/2019/03/logoambicom.jpg";
 
 const ORDER_PDF_CSS = `
-@page { size: A4; margin: 16mm; }
+@page { 
+  size: A4; 
+  margin: 0; 
+}
+@media print {
+  body { 
+    background: #fff !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+    -webkit-print-color-adjust: exact; 
+    print-color-adjust: exact;
+  }
+  .order-pdf-page { 
+    width: 210mm !important; 
+    min-height: 297mm !important; 
+    margin: 0 auto !important; 
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  /* Oculta qualquer elemento que não seja o PDF se impresso da página principal */
+  header, footer, nav, button, .no-print { 
+    display: none !important; 
+  }
+}
+
 html, body { padding: 0; margin: 0; }
 * { box-sizing: border-box; }
 body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff; color: #111827; }
@@ -113,7 +138,7 @@ function safeText(value: unknown, fallback: string): string {
     return text ? text : fallback;
 }
 
- 
+
 
 function OrderPdfDocument({ order, issuedAt }: { order: OrderDetails; issuedAt: Date }) {
     const client = (order as any).clients || {};
@@ -756,12 +781,17 @@ export default function OrdersPage() {
         setTimeout(() => {
             try {
                 win.focus();
-                win.print();
+                // Pequeno delay adicional para garantir que o foco foi aplicado
+                setTimeout(() => {
+                    win.print();
+                    // Removido o cleanup imediato para deixar o diálogo de impressão aberto
+                    // O win.addEventListener("afterprint") já cuida da limpeza
+                }, 50);
             } catch (e) {
                 cleanup();
                 toast.error("Falha ao abrir diálogo de impressão.");
             }
-        }, 150);
+        }, 250);
     };
 
     const handleExportPDF = async (order?: Order) => {
@@ -1797,7 +1827,7 @@ export default function OrdersPage() {
                     <div className="glass-card w-full max-w-6xl max-h-[95vh] overflow-hidden border-border/20 shadow-2xl bg-card/95 relative flex flex-col">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
 
-                        <div className="p-4 sm:p-6 border-b border-border/20 flex items-center justify-between gap-4 shrink-0">
+                        <div className="p-4 sm:p-6 border-b border-border/20 flex items-center justify-between gap-4 shrink-0 no-print">
                             <div className="min-w-0">
                                 <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight flex items-center gap-2">
                                     <Eye className="h-5 w-5 text-primary" />
@@ -1837,7 +1867,7 @@ export default function OrdersPage() {
                                         <OrderPdfDocument order={pdfPreviewOrder} issuedAt={pdfPreviewIssuedAt} />
                                     </div>
                                 </div>
-                                <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground">
+                                <div className="mt-4 flex items-center justify-between text-[10px] text-muted-foreground no-print">
                                     <span className="font-black uppercase tracking-widest opacity-60">Formato A4 • Margens otimizadas</span>
                                     <span className="font-mono opacity-60">{new Date().toLocaleString("pt-BR")}</span>
                                 </div>

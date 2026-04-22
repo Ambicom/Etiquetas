@@ -50,9 +50,11 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.7**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.8**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.8**:
+    - **Correção da Impressão de Pedidos**: Implementação de estilos `@media print` e a classe `no-print` para isolar o relatório de pedidos durante a impressão. Otimização da lógica de foco no iframe de impressão para evitar que o navegador imprima a página inteira ou elementos da interface do modal.
   - **v2.32.7**:
     - **Otimização de Modal Mobile**: Ajuste no alinhamento vertical (`items-start`) para garantir que o cabeçalho do modal de clientes nunca seja cortado em telas de baixa resolução, mantendo a centralização apenas em tablets e computadores.
   - **v2.32.6**:
