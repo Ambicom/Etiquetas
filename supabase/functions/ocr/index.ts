@@ -13,6 +13,16 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
+        if (req.method !== 'POST') {
+            return new Response(JSON.stringify({
+                error: 'METHOD_NOT_ALLOWED: Use POST.',
+                provider: "openai"
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 405,
+            });
+        }
+
         let body;
         try {
             body = await req.json();
@@ -41,9 +51,21 @@ Deno.serve(async (req: Request) => {
             throw new Error('CONFIG_MISSING: OPENAI_API_KEY não está definida nas Secrets do Supabase.');
         }
 
-        if (!image) {
+        if (typeof image !== "string" || image.trim().length === 0) {
             throw new Error('VALIDATION_ERROR: O campo "image" (base64) é obrigatório.');
         }
+
+        const imageTrimmed = image.trim();
+        const estimatedBytes = Math.floor((imageTrimmed.length * 3) / 4);
+        if (estimatedBytes > 8 * 1024 * 1024) {
+            throw new Error(`VALIDATION_ERROR: Imagem muito grande (${estimatedBytes} bytes). Reduza a resolução e tente novamente.`);
+        }
+
+        const mime =
+            imageTrimmed.startsWith("/9j") ? "image/jpeg" :
+                imageTrimmed.startsWith("iVBOR") ? "image/png" :
+                    imageTrimmed.startsWith("UklGR") ? "image/webp" :
+                        "image/jpeg";
 
         console.log(`OpenAI Request: Provider=${provider} Endpoint=${endpoint} Model=${model} Build=${build}`);
 
@@ -65,7 +87,7 @@ Deno.serve(async (req: Request) => {
                             },
                             {
                                 type: "input_image",
-                                image_url: `data:image/jpeg;base64,${image}`
+                                image_url: `data:${mime};base64,${imageTrimmed}`
                             }
                         ]
                     }
@@ -112,9 +134,16 @@ Deno.serve(async (req: Request) => {
         console.log(`OpenAI Status: ${response.status}`);
 
         if (!response.ok) {
-            // Retorna o erro exato da OpenAI para o frontend
             const aiError = resData.error?.message || JSON.stringify(resData);
-            throw new Error(`OPENAI_REJECTED (${response.status}): ${aiError}`);
+            return new Response(JSON.stringify({
+                error: `OPENAI_REJECTED (${response.status}): ${aiError}`,
+                provider,
+                model,
+                build
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: response.status,
+            });
         }
 
         const content =
@@ -138,6 +167,7 @@ Deno.serve(async (req: Request) => {
         return new Response(JSON.stringify({
             error: message,
             provider: "openai",
+            build: "2026-04-25",
             diagnostic: "Verifique se a secret OPENAI_API_KEY está correta e se há créditos/limites na conta da OpenAI."
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
