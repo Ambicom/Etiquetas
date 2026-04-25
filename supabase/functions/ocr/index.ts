@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
                 : (Deno.env.get('OPENAI_MODEL') || "gpt-4o-mini");
         const provider = "openai";
         const endpoint = "https://api.openai.com/v1/chat/completions";
-        const build = "2026-04-25";
+        const build = "2026-04-25T02:10:00Z"; // Forçar redeploy
 
         if (!openaiKey) {
             throw new Error('CONFIG_MISSING: OPENAI_API_KEY não está definida nas Secrets do Supabase.');
