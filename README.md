@@ -50,9 +50,12 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.15**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.16**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.16**:
+    - **Preparação para Repositório Oficial**: Atualização de metadados e documentação para o lançamento no repositório `Ambicom/Etiquetas`.
+    - **Limpeza de Build**: Otimização dos scripts de build e remoção de redundâncias no `package.json`.
   - **v2.32.15**:
     - **Correção da API OpenAI Nativa**: Refatoração da Edge Function `ocr` para utilizar o endpoint oficial `/v1/chat/completions` e a estrutura de payloads `messages` com suporte robusto a Vision. Implementação de `json_schema` (modo strict) para extração técnica de alta confiabilidade.
   - **v2.32.14**:
