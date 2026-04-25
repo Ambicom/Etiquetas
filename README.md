@@ -50,9 +50,11 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.14**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.15**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.15**:
+    - **Correção da API OpenAI Nativa**: Refatoração da Edge Function `ocr` para utilizar o endpoint oficial `/v1/chat/completions` e a estrutura de payloads `messages` com suporte robusto a Vision. Implementação de `json_schema` (modo strict) para extração técnica de alta confiabilidade.
   - **v2.32.14**:
     - **Impressão via PDF Real**: O botão "Imprimir/Salvar PDF" agora gera um arquivo PDF real usando jsPDF + autoTable (em vez de tentar imprimir HTML). O PDF é aberto numa nova aba, onde o navegador permite imprimir ou salvar nativamente. Compatibilidade total com Chrome Desktop e Mobile.
   - **v2.32.13**:

@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
                 ? requestedModel
                 : (Deno.env.get('OPENAI_MODEL') || "gpt-4o-mini");
         const provider = "openai";
-        const endpoint = "https://api.openai.com/v1/responses";
+        const endpoint = "https://api.openai.com/v1/chat/completions";
         const build = "2026-04-25";
 
         if (!openaiKey) {
@@ -77,17 +77,19 @@ Deno.serve(async (req: Request) => {
             },
             body: JSON.stringify({
                 model: model,
-                input: [
+                messages: [
                     {
                         role: "user",
                         content: [
                             {
-                                type: "input_text",
+                                type: "text",
                                 text: "Extraia dados técnicos desta etiqueta industrial para JSON. Retorne apenas o JSON: fabricante, modelo, codigo_comercial, cor, pnc_ml, numero_serie, data_fabricacao, gas_refrigerante, volume_total, tensao, tipo, classe_mercado, carga_gas, compressor, volume_freezer, volume_refrigerator, pressao_alta_baixa, capacidade_congelamento, corrente_eletrica, potencia_degelo, frequencia."
                             },
                             {
-                                type: "input_image",
-                                image_url: `data:${mime};base64,${imageTrimmed}`
+                                type: "image_url",
+                                image_url: {
+                                    url: `data:${mime};base64,${imageTrimmed}`
+                                }
                             }
                         ]
                     }
@@ -146,10 +148,7 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        const content =
-            typeof resData?.output_text === "string" && resData.output_text.trim().length > 0
-                ? resData.output_text
-                : undefined;
+        const content = resData.choices?.[0]?.message?.content;
 
         if (!content) {
             throw new Error('IA_EMPTY_CONTENT: A OpenAI não devolveu conteúdo na resposta.');
