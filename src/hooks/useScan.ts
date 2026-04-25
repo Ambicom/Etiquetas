@@ -79,10 +79,14 @@ export function useScan() {
     try {
       // Converte Base64 (com data:image/...) para apenas o conteúdo
       const base64Image = imageSrc.includes('base64,') ? imageSrc.split('base64,')[1] : imageSrc;
+      const configuredModel = import.meta.env.VITE_OPENAI_MODEL;
 
       // Chama a Edge Function do Supabase para processar o OCR com segurança
       const { data, error: functionError } = await supabase.functions.invoke('ocr', {
-        body: { image: base64Image }
+        body: {
+          image: base64Image,
+          model: typeof configuredModel === "string" && configuredModel.trim().length > 0 ? configuredModel.trim() : undefined
+        }
       });
 
       if (functionError) {

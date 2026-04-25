@@ -20,10 +20,19 @@ Deno.serve(async (req: Request) => {
             throw new Error(`INTERNAL_JSON_PARSE_ERROR: ${(e as Error).message}`);
         }
 
-        const { image } = body;
+        const { image, model: requestedModel } = body;
         const openaiKey = Deno.env.get('OPENAI_API_KEY');
         // Forçando um modelo estável para teste
-        const model = Deno.env.get('OPENAI_MODEL') || "gpt-4o-mini";
+        const allowedModels = new Set([
+            "gpt-4o-mini",
+            "gpt-4o",
+            "gpt-4.1-mini",
+            "gpt-4.1"
+        ]);
+        const model =
+            typeof requestedModel === "string" && allowedModels.has(requestedModel)
+                ? requestedModel
+                : (Deno.env.get('OPENAI_MODEL') || "gpt-4o-mini");
         const provider = "openai";
         const endpoint = "https://api.openai.com/v1/responses";
         const build = "2026-04-25";
