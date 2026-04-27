@@ -50,9 +50,13 @@ Siga os passos abaixo para rodar o projeto localmente:
    npm run dev
    ```
 
-Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.16**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
+Este projeto utiliza o versionamento semântico. A versão atual é **v2.32.17**, representando uma evolução significativa na arquitetura e funcionalidades do sistema original.
 
 ### 📝 Histórico de Versões
+  - **v2.32.17**:
+    - **Correção de Métricas do Dashboard**: Atualização da função RPC `get_dashboard_stats` para incluir as contagens de produtos 'VENDIDOS' e 'REPROVADOS'.
+    - **Novo Card de Reprovados**: Implementação de um novo card no dashboard para exibição de produtos reprovados.
+    - **Reestruturação do Layout**: Ajuste da grade de cards para 2 linhas com 3 cards cada (desktop), otimizando a visualização das métricas principais.
   - **v2.32.16**:
     - **Preparação para Repositório Oficial**: Atualização de metadados e documentação para o lançamento no repositório `Ambicom/Etiquetas`.
     - **Limpeza de Build**: Otimização dos scripts de build e remoção de redundâncias no `package.json`.

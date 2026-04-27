@@ -50,7 +50,8 @@ export default function Home() {
     cadastro: 0,
     avaliacao: 0,
     estoque: 0,
-    vendidos: 0
+    vendidos: 0,
+    reprovados: 0
   });
   const [recentLogs, setRecentLogs] = useState<LogWithRelations[]>([]);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
@@ -80,6 +81,7 @@ export default function Home() {
           avaliacao: statsData.em_avaliacao || 0,
           estoque: statsData.em_estoque || 0,
           vendidos: statsData.vendidos || 0,
+          reprovados: statsData.reprovados || 0,
         });
       } catch (error) {
         logger.error("Erro ao carregar métricas:", error);
@@ -125,8 +127,8 @@ export default function Home() {
     'EM AVALIAÇÃO': { label: 'Em Avaliação', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20', icon: Activity },
     'EM AVALIA├ç├âO': { label: 'Em Avaliação', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20', icon: Activity },
     'EM ESTOQUE': { label: 'Em Estoque', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', icon: Box },
-    'VENDIDO': { label: 'Vendido', color: 'bg-purple-500/10 text-purple-500 border-purple-500/20', icon: CheckCircle2 },
-    'REPROVADO': { label: 'Reprovado', color: 'bg-orange-500/10 text-orange-500 border-orange-500/20', icon: AlertCircle },
+    'VENDIDO': { label: 'Vendido', color: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20', icon: CheckCircle2 },
+    'REPROVADO': { label: 'Reprovado', color: 'bg-rose-500/10 text-rose-500 border-rose-500/20', icon: XCircle },
   };
 
   return (
@@ -197,13 +199,14 @@ export default function Home() {
         </div>
 
         {/* KPI Grid */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid gap-4 sm:gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
           {[
             { label: 'Volume Total', value: stats.total, icon: Package, color: 'blue' },
             { label: 'Cadastro', value: stats.cadastro, icon: Clock, color: 'blue' },
             { label: 'Avaliação', value: stats.avaliacao, icon: Activity, color: 'amber' },
             { label: 'Estoque', value: stats.estoque, icon: Box, color: 'emerald' },
-            { label: 'Vendidos', value: stats.vendidos, icon: CheckCircle2, color: 'purple' },
+            { label: 'Reprovados', value: stats.reprovados, icon: XCircle, color: 'rose' },
+            { label: 'Vendidos', value: stats.vendidos, icon: CheckCircle2, color: 'indigo' },
           ].map((kpi, i) => (
             <div key={i} className="glass-card p-6 bg-card/40 border-border/10 relative overflow-hidden group hover:border-primary/30 transition-all">
               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -215,7 +218,8 @@ export default function Home() {
                   kpi.color === 'blue' && "bg-blue-500/10 text-blue-500 border-blue-500/20",
                   kpi.color === 'amber' && "bg-amber-500/10 text-amber-500 border-amber-500/20",
                   kpi.color === 'emerald' && "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-                  kpi.color === 'purple' && "bg-purple-500/10 text-purple-500 border-purple-500/20",
+                  kpi.color === 'indigo' && "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
+                  kpi.color === 'rose' && "bg-rose-500/10 text-rose-500 border-rose-500/20",
                 )}>
                   <kpi.icon className="h-6 w-6" />
                 </div>
